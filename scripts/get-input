@@ -1,0 +1,18 @@
+#!/bin/bash
+
+day=$1
+
+# Keep session key here
+. cookies.sh
+
+export ADVENT_OF_CODE_SESSION
+
+aoc download --year 2023 --day $day --input-file data/input_$day.txt --puzzle-file data/puzzle_$day.md
+
+git add data/input_$day.txt data/puzzle_$day.md
+
+if [ ! -f examples/day${day}.rs ]; then
+    sed -e "s/\\\$N/$day/g" < scripts/template.rs > examples/day${day}.rs
+    git add examples/day${day}.rs
+fi
+git commit -m"Add day $day input" data/input_$day.txt data/puzzle_$day.md examples/day${day}.rs

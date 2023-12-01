@@ -1,23 +1,13 @@
 #[allow(unused)]
 use adventofcode2023::{get_input,parse_lines,regex_parser,timeit};
 
-type Data = String;
+type Data = ();
 fn parse_input(input: &str) -> Data {
-    input.into()
 }
 
 timeit!{
 fn part1(data: &Data) -> usize {
-    let mut sum = 0usize;
-    for line in data.lines() {
-        let digits = line
-            .chars()
-            .filter(|c| *c >= '0' && *c <= '9')
-            .map(|c| (c as usize) - '0' as usize)
-            .collect::<Vec<_>>();
-        sum += digits[0] * 10 + digits.last().unwrap();
-    }
-    sum
+    unimplemented!()
 }}
 timeit!{
 fn part2(data: &Data) -> usize {
@@ -26,18 +16,15 @@ fn part2(data: &Data) -> usize {
 
 #[test]
 fn test() {
-    let tests = r#"1abc2
-pqr3stu8vwx
-a1b2c3d4e5f
-treb7uchet"#;
+    let tests = r#""#;
     let data = parse_input(&tests);
 
-    assert_eq!(part1(&data), 142);
+    assert_eq!(part1(&data), 0);
     assert_eq!(part2(&data), 0);
 }
 
 fn main() -> std::io::Result<()>{
-    let input = get_input(1)?;
+    let input = get_input($N)?;
 
     let data = parse_input(&input);
 
