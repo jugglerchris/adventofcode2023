@@ -74,7 +74,19 @@ fn part1(data: &Data) -> usize {
 }}
 timeit!{
 fn part2(data: &Data) -> usize {
-    unimplemented!()
+    let mut result = 0;
+    for game in data {
+        let mut max_red = 0;
+        let mut max_green = 0;
+        let mut max_blue = 0;
+        for round in &game.rounds {
+            max_red = max_red.max(round.red);
+            max_green = max_green.max(round.green);
+            max_blue = max_blue.max(round.blue);
+        }
+        result += max_red * max_green * max_blue;
+    }
+    result
 }}
 
 #[test]
@@ -87,7 +99,7 @@ Game 5: 6 red, 1 blue, 3 green; 2 blue, 1 red, 2 green"#;
     let data = parse_input(&tests);
 
     assert_eq!(part1(&data), 8);
-    assert_eq!(part2(&data), 0);
+    assert_eq!(part2(&data), 2286);
 }
 
 fn main() -> std::io::Result<()>{
