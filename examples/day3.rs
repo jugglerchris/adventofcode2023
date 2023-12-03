@@ -38,8 +38,7 @@ fn parse_input(input: &str) -> Data {
                             digits: 1
                         });
                     } else {
-                        let part = dbg!(part.as_mut().unwrap());
-                        dbg!((x, y));
+                        let part = part.as_mut().unwrap();
                         assert!(x == 0 || (part.x == x - part.digits && part.y == y));
                         part.val = (part.val * 10) + (c - b'0') as usize;
                         part.digits += 1;
@@ -74,7 +73,24 @@ fn part1(data: &Data) -> usize {
 }}
 timeit!{
 fn part2(data: &Data) -> usize {
-    unimplemented!()
+    let mut sum = 0;
+    for ((x, y), symbol) in &data.symbols {
+        let x = *x;
+        let y = *y;
+        if let Symbol(b'*') = symbol {
+            let mut adjacent = Vec::new();
+            for part in &data.parts {
+                if x+1 >= part.x && x <= part.x+part.digits &&
+                   y+1 >= part.y && y <= part.y+1 {
+                    adjacent.push(part);
+                }
+            }
+            if adjacent.len() == 2 {
+                sum += adjacent[0].val * adjacent[1].val;
+            }
+        }
+    }
+    sum
 }}
 
 #[test]
@@ -92,7 +108,7 @@ fn test() {
     let data = parse_input(&tests);
 
     assert_eq!(part1(&data), 4361);
-//    assert_eq!(part2(&data), 0);
+    assert_eq!(part2(&data), 467835);
 }
 
 fn main() -> std::io::Result<()>{
