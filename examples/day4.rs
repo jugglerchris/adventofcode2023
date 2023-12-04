@@ -8,6 +8,29 @@ pub struct Card {
     pub id: usize,
     pub have: Vec<usize>,
     pub winning: Vec<usize>,
+    pub num_winning: usize,
+}
+
+impl Card {
+    pub fn new(
+        id: usize,
+        have: Vec<usize>,
+        winning: Vec<usize>) -> Card {
+
+        let winning_set = winning.iter().cloned().collect::<HashSet<usize>>();
+        let num_winning = have
+            .iter()
+            .cloned()
+            .filter(|n| winning_set.contains(n))
+            .count();
+
+        Card {
+            id,
+            have,
+            winning,
+            num_winning
+        }
+    }
 }
 
 regex_parser!(parse_card: Card {
@@ -21,11 +44,8 @@ regex_parser!(parse_card: Card {
                 .filter(|s| !s.is_empty())
                 .map(|s| s.parse().unwrap())
                 .collect::<Vec<usize>>();
-            Card {
-                id,
-                have,
-                winning
-            }
+
+            Card::new(id, have, winning)
         }
 });
 
@@ -38,12 +58,7 @@ timeit!{
 fn part1(data: &Data) -> usize {
     let mut sum = 0;
     for card in data {
-        let winning = card.winning.iter().cloned().collect::<HashSet<usize>>();
-        let num_wins = card.have
-            .iter()
-            .cloned()
-            .filter(|n| winning.contains(n))
-            .count();
+        let num_wins = card.num_winning;
         if num_wins > 0 {
             sum += 1 << (num_wins - 1);
         }
@@ -52,7 +67,19 @@ fn part1(data: &Data) -> usize {
 }}
 timeit!{
 fn part2(data: &Data) -> usize {
-    unimplemented!()
+    let mut num_cards = vec![1; data.len()];
+
+    for i in 0..data.len() {
+        let card = &data[i];
+        let count = num_cards[i];
+        let num_wins = card.num_winning;
+        if num_wins > 0 {
+            for j in (i+1)..=(i+num_wins) {
+                num_cards[j] += count;
+            }
+        }
+    }
+    num_cards.iter().cloned().sum()
 }}
 
 #[test]
@@ -66,7 +93,7 @@ Card 6: 31 18 13 56 72 | 74 77 10 23 35 67 36 11"#;
     let data = parse_input(&tests);
 
     assert_eq!(part1(&data), 13);
-//    assert_eq!(part2(&data), 0);
+    assert_eq!(part2(&data), 30);
 }
 
 fn main() -> std::io::Result<()>{
