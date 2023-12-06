@@ -35,6 +35,36 @@ impl Map {
             }
         }
     }
+    // Returns the whole range
+    fn lookup_len(&self, id: Id) -> (Id, Id) {
+        let m = self.map.binary_search_by(
+            |item| {
+                if item.0 > id {
+                    std::cmp::Ordering::Greater
+                } else if (item.0 + item.2) <= id {
+                    std::cmp::Ordering::Less
+                } else {
+                    std::cmp::Ordering::Equal
+                }
+            });
+        match m {
+            Ok(idx) => {
+                let item = self.map[idx];
+                let offset = id - item.0;
+                let new_id = item.1 + offset;
+                let count = item.2 - offset; 
+                (new_id, count)
+            }
+            Err(idx) => {
+                if idx == self.map.len() {
+                    (id, Id::MAX)
+                } else {
+                    let item = self.map[idx];
+                    (id, item.0 - id)
+                }
+            }
+        }
+    }
 }
 
 struct Data {
@@ -54,6 +84,29 @@ impl Data {
             id = new_id;
         }
         id
+    }
+    // Returns (Id, num) pairs
+    pub fn map_to_multiple(&self, target: &str, seed: Id, count: Id) -> Vec<(Id, Id)> {
+        let mut cur_type = "seed";
+        let mut ranges = vec![(seed, count)];
+        while cur_type != target {
+            let mut new_ranges = Vec::new();
+            let map = self.maps.get(cur_type).unwrap();
+            for (start, startlen) in ranges {
+                let mut id = start;
+                let mut len = startlen;
+                while id < (start + startlen) {
+                    let (new_id, mapped_len) = map.lookup_len(id);
+                    let overlap = len.min(mapped_len);
+                    new_ranges.push((new_id, overlap));
+                    id += overlap;
+                    len -= overlap;
+                }
+            }
+            cur_type = &map.dest;
+            ranges = new_ranges;
+        }
+        ranges
     }
 }
 
@@ -119,7 +172,20 @@ fn part1(data: &Data) -> usize {
 }}
 timeit!{
 fn part2(data: &Data) -> usize {
-    unimplemented!()
+    let mut min_loc = Id::MAX;
+
+    let mut seed_iter = data.seeds.iter().cloned();
+    while let Some(seed) = seed_iter.next() {
+        let seed_count = seed_iter.next().unwrap(); 
+
+        let new_locs = data.map_to_multiple("location", seed, seed_count);
+        let new_min = new_locs.into_iter()
+                .min()
+                .unwrap()
+                .0;
+        min_loc = min_loc.min(new_min);
+    }
+    min_loc
 }}
 
 #[test]
@@ -165,7 +231,7 @@ humidity-to-location map:
     assert_eq!(data.map_to("location", 13), 35);
 
     assert_eq!(part1(&data), 35);
-//    assert_eq!(part2(&data), 0);
+    assert_eq!(part2(&data), 46);
 }
 
 fn main() -> std::io::Result<()>{
