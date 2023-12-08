@@ -60,7 +60,29 @@ fn part1(data: &Data) -> usize {
 }}
 timeit!{
 fn part2(data: &Data) -> usize {
-    unimplemented!()
+    let mut poses = data.map
+        .keys()
+        .filter(|k| k.ends_with('A'))
+        .map(|s| s.as_str())
+        .collect::<Vec<&str>>();
+    let mut steps = 0;
+    let mut moves = data.insns.iter().cloned().cycle();
+
+    while !poses.iter()
+             .all(|p| p.ends_with('Z')) {
+
+        let mv =  moves.next().unwrap();
+        for pos in &mut poses {
+            let entry = data.map.get(*pos).unwrap();
+            match mv {
+                b'L' => { *pos = &entry.0; }
+                b'R' => { *pos = &entry.1; }
+                _ => panic!()
+            }
+        }
+        steps += 1;
+    }
+    steps
 }}
 
 #[test]
@@ -86,7 +108,18 @@ ZZZ = (ZZZ, ZZZ)
 
     assert_eq!(part1(&data1), 2);
     assert_eq!(part1(&data2), 6);
-//    assert_eq!(part2(&data), 0);
+
+    let test_part2 = r#"LR
+
+11A = (11B, XXX)
+11B = (XXX, 11Z)
+11Z = (11B, XXX)
+22A = (22B, XXX)
+22B = (22C, 22C)
+22C = (22Z, 22Z)
+22Z = (22B, 22B)
+XXX = (XXX, XXX)"#;
+    assert_eq!(part2(&parse_input(test_part2)), 6);
 }
 
 fn main() -> std::io::Result<()>{
