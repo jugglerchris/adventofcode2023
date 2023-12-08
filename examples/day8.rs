@@ -58,31 +58,54 @@ fn part1(data: &Data) -> usize {
     }
     steps
 }}
+
+// Returns number of steps and ending point
+fn steps_to<'a>(data: &'a Data, start_step: usize, start: &'a str) -> (usize, &'a str) {
+    let mut pos = start;
+    let mut steps = start_step;
+    let mut moves = data.insns.iter().cloned().cycle().skip(start_step);
+    loop {
+        let entry = data.map.get(pos).unwrap();
+        let mv = moves.next().unwrap();
+        match mv {
+            b'L' => { pos = &entry.0; }
+            b'R' => { pos = &entry.1; }
+            _ => panic!()
+        }
+        steps += 1;
+        if pos.ends_with('Z') {
+            break;
+        }
+    }
+    (steps, pos)
+}
+
+fn lcm(a: usize, b: usize) -> usize {
+    let g = adventofcode2023::gcd(a, b);
+    (a / g) * b
+}
+
 timeit!{
 fn part2(data: &Data) -> usize {
-    let mut poses = data.map
+    let poses = data.map
         .keys()
         .filter(|k| k.ends_with('A'))
         .map(|s| s.as_str())
         .collect::<Vec<&str>>();
-    let mut steps = 0;
-    let mut moves = data.insns.iter().cloned().cycle();
 
-    while !poses.iter()
-             .all(|p| p.ends_with('Z')) {
-
-        let mv =  moves.next().unwrap();
-        for pos in &mut poses {
-            let entry = data.map.get(*pos).unwrap();
-            match mv {
-                b'L' => { *pos = &entry.0; }
-                b'R' => { *pos = &entry.1; }
-                _ => panic!()
-            }
-        }
-        steps += 1;
+    let mut first_hits = Vec::new();
+    let mut repeat = Vec::new();
+    for pos in poses {
+        let (first, endpos) = steps_to(data, 0, pos);
+        let (second, _) = steps_to(data, first, endpos);
+        first_hits.push(first);
+        repeat.push(second - first);
     }
-    steps
+    // It turns out that they all repeat at the ends of the list of
+    // instructions, so we don't need to do any complicated CRT or
+    // anything.
+    repeat.into_iter()
+          .fold(1, |a, b| lcm(a, b))
 }}
 
 #[test]

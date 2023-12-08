@@ -75,3 +75,16 @@ fn get_input_str(s: &str) -> io::Result<String> {
 pub fn get_input(n: u32) -> io::Result<String> {
     get_input_str(&format!("data/input_{}.txt", n))
 }
+
+pub fn gcd(a: usize, b: usize) -> usize {
+    let (mut a, mut b) = if a > b {
+        (a, b)
+    } else {
+        (b, a)
+    };
+    while b > 0 {
+        a = a % b;
+        std::mem::swap(&mut a, &mut b);
+    }
+    a
+}
