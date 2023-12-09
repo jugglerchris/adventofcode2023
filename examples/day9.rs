@@ -39,8 +39,30 @@ fn part1(data: &Data) -> isize {
     sum
 }}
 timeit!{
-fn part2(data: &Data) -> usize {
-    unimplemented!()
+fn part2(data: &Data) -> isize {
+    let mut sum = 0;
+    for seq in data {
+        let mut derivs = vec![seq.clone()];
+        // Calculate the derivatives
+        loop {
+            let mut vals = Vec::new();
+            for pair in derivs.last().unwrap().windows(2) {
+                vals.push(pair[1] - pair[0]);
+            }
+            if vals.iter().all(|v| *v == 0) {
+                break;
+            } else {
+                derivs.push(vals);
+            }
+        }
+        // Now extrapolate
+        let mut inc = 0;
+        while let Some(mut v) = derivs.pop() {
+            inc = *v.first().unwrap() - inc;
+        }
+        sum += inc;
+    }
+    sum
 }}
 
 #[test]
@@ -51,7 +73,7 @@ fn test() {
     let data = parse_input(&tests);
 
     assert_eq!(part1(&data), 114);
-//    assert_eq!(part2(&data), 0);
+    assert_eq!(part2(&data), 2);
 }
 
 fn main() -> std::io::Result<()>{
