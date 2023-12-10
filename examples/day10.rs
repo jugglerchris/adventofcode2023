@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 #[allow(unused)]
 use adventofcode2023::{get_input,parse_lines,regex_parser,timeit};
 
@@ -106,9 +108,64 @@ fn part1(data: &Data) -> usize {
         }
     }
 }}
+
 timeit!{
 fn part2(data: &Data) -> usize {
-    unimplemented!()
+    let mut last_pos = data.start_pos;
+    let mut pos = data.start_pos;
+
+    let mut in_pipe = HashSet::new();
+
+    loop {
+        let connections = data.connected(pos);
+        assert_eq!(connections.len(), 2);
+        let new_pos = if connections[0] == last_pos {
+            connections[1]
+        } else {
+            // The first time around, last_pos will be wrong, so we'll pick
+            // a random direction
+            connections[0]
+        };
+        last_pos = pos;
+        pos = new_pos;
+        in_pipe.insert(pos);
+        if pos == data.start_pos {
+            break;
+        }
+    }
+
+    let mut count = 0;
+    //let mut outmap = Vec::new();
+    for (y, row) in data.field.iter().enumerate() {
+        //let mut out_row = String::new();
+
+        let mut inside = false;
+
+        for (x, _) in row.iter().enumerate() {
+            if in_pipe.contains(&(x, y)) {
+                // Think of the trace being just below the centre of the square,
+                // so that we don't have to worry about horizontal parts, and just
+                // consider a crossing if this cell connects to the one to the
+                // south.
+                if data.is_connected((x,y), (x, y+1)) {
+                    inside = !inside;
+                }
+                //out_row.push(data.field[y][x] as char);
+            } else if inside {
+                count += 1;
+                //out_row.push('I');
+            } else {
+                //out_row.push('O');
+            }
+        }
+        //outmap.push(out_row);
+    }
+    /*
+    for s in outmap {
+        println!("{}", s);
+    }
+    */
+    count
 }}
 
 #[test]
@@ -121,7 +178,31 @@ LJ..."#;
     let data = parse_input(&tests);
 
     assert_eq!(part1(&data), 8);
-//    assert_eq!(part2(&data), 0);
+
+    let test2_1 = r#"...........
+.S-------7.
+.|F-----7|.
+.||.....||.
+.||.....||.
+.|L-7.F-J|.
+.|..|.|..|.
+.L--J.L--J.
+..........."#;
+    let test2_2 = r#".F----7F7F7F7F-7....
+.|F--7||||||||FJ....
+.||.FJ||||||||L7....
+FJL7L7LJLJ||LJ.L-7..
+L--J.L7...LJS7F-7L7.
+....F-J..F7FJ|L7L7L7
+....L7.F7||L7|.L7L7|
+.....|FJLJ|FJ|F7|.LJ
+....FJL-7.||.||||...
+....L---J.LJ.LJLJ..."#;
+
+    let data2_1 = parse_input(&test2_1);
+    let data2_2 = parse_input(&test2_2);
+    assert_eq!(part2(&data2_1), 4);
+    assert_eq!(part2(&data2_2), 8);
 }
 
 fn main() -> std::io::Result<()>{
