@@ -31,8 +31,7 @@ fn dist((x1, y1): (usize, usize), (x2, y2): (usize, usize)) -> usize {
     d
 }
 
-timeit!{
-fn part1(data: &Data) -> usize {
+fn with_expansion(data: &Data, exp: usize) -> usize {
     let mut row_map = Vec::new();
     let mut col_map = Vec::new();
 
@@ -55,7 +54,7 @@ fn part1(data: &Data) -> usize {
                 x += 1;
             } else {
                 // Expansion
-                x += 2;
+                x += exp;
             }
         }
     }
@@ -67,7 +66,7 @@ fn part1(data: &Data) -> usize {
                 y += 1;
             } else {
                 // Expansion
-                y += 2;
+                y += exp;
             }
         }
     }
@@ -84,11 +83,16 @@ fn part1(data: &Data) -> usize {
         }
     }
     sum
+}
+
+timeit!{
+fn part1(data: &Data) -> usize {
+    with_expansion(data, 2)
 }}
 
 timeit!{
 fn part2(data: &Data) -> usize {
-    unimplemented!()
+    with_expansion(data, 1000000)
 }}
 
 #[test]
@@ -106,7 +110,8 @@ fn test() {
     let data = parse_input(&tests);
 
     assert_eq!(part1(&data), 374);
-//    assert_eq!(part2(&data), 0);
+    assert_eq!(with_expansion(&data, 10), 1030);
+    assert_eq!(with_expansion(&data, 100), 8410);
 }
 
 fn main() -> std::io::Result<()>{
