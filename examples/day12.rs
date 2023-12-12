@@ -54,13 +54,11 @@ fn parse_input(input: &str) -> Data {
 }
 
 fn count_matches(row: &Row) -> usize {
-    eprintln!("{row}");
     let tot_failed: u32 = row.runs.iter().sum::<usize>() as u32;
     let _tot_ok = row.springs.len() as u32 - tot_failed;
     let num_unknown = row.springs.iter().cloned().filter(|&s| s == Spring::Unknown).count() as u32;
     let num_known_failed = row.springs.iter().cloned().filter(|&s| s == Spring::Damaged).count() as u32;
     let needed_damaged = tot_failed - num_known_failed;
-    dbg!(num_unknown);
 
     let mut count = 0;
     'main: for mut repl in 0u64..=((1<<num_unknown)-1) {
@@ -117,13 +115,19 @@ fn count_matches(row: &Row) -> usize {
         }
         count += 1;
     }
-    dbg!(count)
+    count
 }
 
 timeit!{
 fn part1(data: &Data) -> usize {
     data.iter()
         .map(count_matches)
+        .sum()
+}}
+timeit!{
+fn part1_2(data: &Data) -> usize {
+    data.iter()
+        .map(count_matches2)
         .sum()
 }}
 
@@ -142,11 +146,100 @@ fn expand_part2(row: &Row) -> Row {
     }
 }
 
+fn to_bits<I: Iterator<Item = bool>>(i: I) -> u128 {
+    let mut result = 0u128;
+    for b in i {
+        result <<= 1;
+        if b {
+            result |= 1;
+        }
+    }
+    result
+}
+
+fn count_placings(runs: &[usize], set: u128, maybe: u128, clear: u128) -> usize {
+//    eprintln!("count_placings({runs:?}, {set:b}, {maybe:b}, {clear:b}");
+    if runs.len() == 0 {
+//        eprintln!("Return early");
+        return if set == 0 { 1 } else { 0 };
+    }
+    let next_piece = runs[0];
+    let piece_bits = (1u128 << next_piece) - 1;
+    let num_bits = 128 - maybe.leading_zeros();
+//    dbg!((next_piece, piece_bits, num_bits));
+
+    // Minimum space to the right including gaps
+    let mut first_pos: u32 = runs[1..].iter().map(|&n| (n as u32) +1).sum();
+
+    let num_bits_known_set = 128 - set.leading_zeros();
+//    dbg!((num_bits_known_set, next_piece));
+    if num_bits_known_set >= next_piece as u32{
+        first_pos = first_pos.max(num_bits_known_set - next_piece as u32)
+    }
+
+    if num_bits < next_piece as u32 {
+        return 0;
+    }
+    let last_pos = num_bits - next_piece as u32;
+
+    let mut count = 0;
+//    dbg!((first_pos, last_pos));
+
+    for shift in first_pos..=last_pos {
+        let shifted = piece_bits << shift;
+
+        if (shifted & clear) != 0 {
+            // Can't overlap any clear bits
+            continue;
+        }
+
+        // The following bit must not be set.
+        if shift > 0 && ((1<<(shift-1)) & set != 0) {
+            continue;
+        }
+
+        let next_mask = if shift == 0 {
+            0
+        } else {
+            (1 << (shift -1)) - 1
+        };
+        count += count_placings(&runs[1..],
+                                set & next_mask,
+                                maybe & next_mask,
+                                clear & next_mask);
+    }
+//    dbg!(count)
+    count
+}
+
+fn count_matches2(row: &Row) -> usize {
+    eprintln!("{row} len {}", row.springs.len());
+    assert!(row.springs.len() <= 128);
+
+    // Useful bitsets
+    let bits_damaged = to_bits(
+        row.springs
+           .iter()
+           .map(|&s| s == Spring::Damaged));
+    let bits_maybedamaged = to_bits(
+        row.springs
+           .iter()
+           .map(|&s| s != Spring::Operational));
+    let bits_clear = to_bits(
+        row.springs
+           .iter()
+           .map(|&s| s == Spring::Operational));
+
+    let result = count_placings(&row.runs, bits_damaged, bits_maybedamaged, bits_clear);
+//    dbg!(result)
+    result
+}
+
 timeit!{
 fn part2(data: &Data) -> usize {
     data.iter()
         .map(expand_part2)
-        .map(|r| count_matches(&r))
+        .map(|r| count_matches2(&r))
         .sum()
 }}
 
@@ -161,6 +254,7 @@ fn test() {
     let data = parse_input(&tests);
 
     assert_eq!(part1(&data), 21);
+    assert_eq!(part1_2(&data), 21);
     assert_eq!(part2(&data), 525152);
 }
 
