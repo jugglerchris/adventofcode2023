@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 #[allow(unused)]
 use adventofcode2023::{get_input,parse_lines,regex_parser,timeit};
 
@@ -157,7 +159,12 @@ fn to_bits<I: Iterator<Item = bool>>(i: I) -> u128 {
     result
 }
 
-fn count_placings(runs: &[usize], set: u128, maybe: u128, clear: u128) -> usize {
+type Cache<'a> = HashMap<(&'a [usize], u128, u128, u128), usize>;
+
+fn count_placings<'c, 'a:'c>(cache: &'c mut Cache<'a>, runs: &'a [usize], set: u128, maybe: u128, clear: u128) -> usize {
+    if let Some(result) = cache.get(&(runs, set, maybe, clear)) {
+        return *result;
+    }
 //    eprintln!("count_placings({runs:?}, {set:b}, {maybe:b}, {clear:b}");
     if runs.len() == 0 {
 //        eprintln!("Return early");
@@ -203,12 +210,13 @@ fn count_placings(runs: &[usize], set: u128, maybe: u128, clear: u128) -> usize 
         } else {
             (1 << (shift -1)) - 1
         };
-        count += count_placings(&runs[1..],
+        count += count_placings(cache, &runs[1..],
                                 set & next_mask,
                                 maybe & next_mask,
                                 clear & next_mask);
     }
 //    dbg!(count)
+    cache.insert((runs, set, maybe, clear), count);
     count
 }
 
@@ -230,7 +238,8 @@ fn count_matches2(row: &Row) -> usize {
            .iter()
            .map(|&s| s == Spring::Operational));
 
-    let result = count_placings(&row.runs, bits_damaged, bits_maybedamaged, bits_clear);
+    let mut cache: Cache = HashMap::new();
+    let result = count_placings(&mut cache, &row.runs, bits_damaged, bits_maybedamaged, bits_clear);
 //    dbg!(result)
     result
 }
