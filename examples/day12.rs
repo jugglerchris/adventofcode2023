@@ -54,11 +54,13 @@ fn parse_input(input: &str) -> Data {
 }
 
 fn count_matches(row: &Row) -> usize {
+    eprintln!("{row}");
     let tot_failed: u32 = row.runs.iter().sum::<usize>() as u32;
     let _tot_ok = row.springs.len() as u32 - tot_failed;
     let num_unknown = row.springs.iter().cloned().filter(|&s| s == Spring::Unknown).count() as u32;
     let num_known_failed = row.springs.iter().cloned().filter(|&s| s == Spring::Damaged).count() as u32;
     let needed_damaged = tot_failed - num_known_failed;
+    dbg!(num_unknown);
 
     let mut count = 0;
     'main: for mut repl in 0u64..=((1<<num_unknown)-1) {
@@ -115,7 +117,7 @@ fn count_matches(row: &Row) -> usize {
         }
         count += 1;
     }
-    count
+    dbg!(count)
 }
 
 timeit!{
@@ -124,9 +126,28 @@ fn part1(data: &Data) -> usize {
         .map(count_matches)
         .sum()
 }}
+
+fn expand_part2(row: &Row) -> Row {
+    let mut springs = row.springs.clone();
+    for _ in 0..4 {
+        springs.push(Spring::Unknown);
+        springs.extend_from_slice(&row.springs);
+    }
+    let mut runs = row.runs.clone();
+    for _ in 0..4 {
+        runs.extend_from_slice(&row.runs);
+    }
+    Row {
+        springs, runs
+    }
+}
+
 timeit!{
-fn part2(_data: &Data) -> usize {
-    unimplemented!()
+fn part2(data: &Data) -> usize {
+    data.iter()
+        .map(expand_part2)
+        .map(|r| count_matches(&r))
+        .sum()
 }}
 
 #[test]
@@ -140,7 +161,7 @@ fn test() {
     let data = parse_input(&tests);
 
     assert_eq!(part1(&data), 21);
-//    assert_eq!(part2(&data), 0);
+    assert_eq!(part2(&data), 525152);
 }
 
 fn main() -> std::io::Result<()>{
