@@ -221,7 +221,7 @@ fn count_placings<'c, 'a:'c>(cache: &'c mut Cache<'a>, runs: &'a [usize], set: u
 }
 
 fn count_matches2(row: &Row) -> usize {
-    eprintln!("{row} len {}", row.springs.len());
+//    eprintln!("{row} len {}", row.springs.len());
     assert!(row.springs.len() <= 128);
 
     // Useful bitsets
