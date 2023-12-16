@@ -49,13 +49,12 @@ fn next_pos((x, y): (usize, usize), width: usize, height: usize, dir: Dir) -> Op
     }
 }
 
-timeit!{
-fn part1(data: &Data) -> usize {
+fn count_energy(data: &Data, pos: (usize, usize), dir: Dir) -> usize {
     let height = data.len();
     let width = data[0].len();
     let mut visited = HashSet::new();
-    visited.insert(((0, 0), Dir::Right));
-    let mut beams = vec![((0, 0), Dir::Right)];
+    visited.insert((pos, dir));
+    let mut beams = vec![(pos, dir)];
     while !beams.is_empty() {
         // List of possible next positions
         let mut new_beams = vec![];
@@ -88,10 +87,27 @@ fn part1(data: &Data) -> usize {
         beams = new_beams;
     }
     visited.into_iter().map(|(pos, _)| pos).collect::<HashSet<(usize, usize)>>().len()
+}
+
+timeit!{
+fn part1(data: &Data) -> usize {
+    count_energy(data, (0, 0), Dir::Right)
 }}
 timeit!{
-fn part2(_data: &Data) -> usize {
-    unimplemented!()
+fn part2(data: &Data) -> usize {
+    let height = data.len();
+    let width = data[0].len();
+
+    let mut result = 0;
+    for y in 0..height {
+        result = result.max(count_energy(data, (0, y), Dir::Right));
+        result = result.max(count_energy(data, (width-1, y), Dir::Left));
+    }
+    for x in 0..width {
+        result = result.max(count_energy(data, (x, 0), Dir::Down));
+        result = result.max(count_energy(data, (x, height-1), Dir::Up));
+    }
+    result
 }}
 
 #[test]
@@ -109,7 +125,7 @@ fn test() {
     let data = parse_input(&tests);
 
     assert_eq!(part1(&data), 46);
-//    assert_eq!(part2(&data), 0);
+    assert_eq!(part2(&data), 51);
 }
 
 fn main() -> std::io::Result<()>{
