@@ -46,51 +46,69 @@ impl PartialOrd for CellState {
     }
 }
 
-fn nextmoves(data: &Data, state: &CellState) -> Vec<CellState> {
+fn nextmoves(data: &Data, state: &CellState, min_moves: usize, max_moves: usize) -> Vec<CellState> {
     let mut newstates = Vec::new();
+    let width = data[0].len();
+    let height = data.len();
     match state.lastdir {
         Dir::Up | Dir::Down => {
             // do left/right moves
-            let mut x = state.x;
             let mut cost = state.cost;
-            while x > 0 && x+3 > state.x {
-                x -= 1;
+            for i in 1..=max_moves {
+                if i > state.x {
+                    break;
+                }
+                let x = state.x - i;
                 cost += data[state.y][x] as usize;
-                newstates.push(CellState { cost, lastdir: Dir::Left, x, y: state.y });
+                if i >= min_moves {
+                    newstates.push(CellState { cost, lastdir: Dir::Left, x, y: state.y });
+                }
             }
 
-            x = state.x;
             cost = state.cost;
-            while x+1 < data[0].len() && state.x+3 > x {
-                x += 1;
+            for i in 1..=max_moves {
+                let x = state.x + i;
+                if x >= width {
+                    break;
+                }
                 cost += data[state.y][x] as usize;
-                newstates.push(CellState { cost, lastdir: Dir::Right, x, y: state.y });
+                if i >= min_moves {
+                    newstates.push(CellState { cost, lastdir: Dir::Right, x, y: state.y });
+                }
             }
         }
         Dir::Left | Dir::Right => {
             // do up/down moves
-            let mut y = state.y;
             let mut cost = state.cost;
-            while y > 0 && y+3 > state.y {
-                y -= 1;
+
+            for i in 1..=max_moves {
+                if i > state.y {
+                    break;
+                }
+                let y = state.y - i;
                 cost += data[y][state.x] as usize;
-                newstates.push(CellState { cost, lastdir: Dir::Up, x: state.x, y });
+                if i >= min_moves {
+                    newstates.push(CellState { cost, lastdir: Dir::Up, x: state.x, y });
+                }
             }
 
-            y = state.y;
             cost = state.cost;
-            while y+1 < data.len() && state.y+3 > y {
-                y += 1;
+            for i in 1..=max_moves {
+                let y = state.y + i;
+                if y >= height {
+                    break;
+                }
                 cost += data[y][state.x] as usize;
-                newstates.push(CellState { cost, lastdir: Dir::Down, x: state.x, y });
+                if i >= min_moves {
+                    newstates.push(CellState { cost, lastdir: Dir::Down, x: state.x, y });
+                }
             }
         }
     }
     newstates
 }
 
-timeit!{
-fn part1(data: &Data) -> usize {
+fn solve(data: &Data, min_move: usize, max_move: usize) -> usize {
     let mut seen = HashMap::new();
     let mut options = BinaryHeap::new();
     let mut best_cost = usize::MAX;
@@ -119,7 +137,7 @@ fn part1(data: &Data) -> usize {
             break;
         }
 
-        for newstate in nextmoves(data, &state) {
+        for newstate in nextmoves(data, &state, min_move, max_move) {
             let seenkey = (newstate.x, newstate.y, newstate.lastdir);
             let prevseen = seen.get_mut(&seenkey);
             if match prevseen {
@@ -141,10 +159,15 @@ fn part1(data: &Data) -> usize {
     }
 
     best_cost
+}
+
+timeit!{
+fn part1(data: &Data) -> usize {
+    solve(data, 1, 3)
 }}
 timeit!{
 fn part2(data: &Data) -> usize {
-    unimplemented!()
+    solve(data, 4, 10)
 }}
 
 #[test]
@@ -165,7 +188,7 @@ fn test() {
     let data = parse_input(&tests);
 
     assert_eq!(part1(&data), 102);
-//    assert_eq!(part2(&data), 0);
+    assert_eq!(part2(&data), 94);
 }
 
 fn main() -> std::io::Result<()>{
