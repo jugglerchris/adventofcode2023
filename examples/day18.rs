@@ -1,4 +1,4 @@
-use std::collections::{HashSet, BTreeSet};
+use std::collections::BTreeSet;
 
 #[allow(unused)]
 use adventofcode2023::{get_input,parse_lines,regex_parser,timeit};
@@ -140,9 +140,176 @@ fn part1(data: &Data) -> usize {
     }
     dug
 }}
+
+#[derive(Eq, Ord, PartialEq, PartialOrd, Debug, Copy, Clone)]
+enum EdgeType {
+    Up,   // At the bottom of the edge
+    Down, // At the top of the edge
+    Cross // Edge goes up and down from here
+}
 timeit!{
-fn part2(data: &Data) -> usize {
-    unimplemented!()
+fn part2(data: &Data) -> isize {
+    let mut pos = (0, 0);
+    let mut edges: Vec<((isize, isize), (isize, isize))> = Vec::new();
+
+    let mut min_x = isize::MAX;
+    let mut min_y = isize::MAX;
+    let mut max_x = isize::MIN;
+    let mut max_y = isize::MIN;
+
+    let mut y_values = BTreeSet::new();
+
+    for dig in data {
+        let inc = match dig.colour.as_bytes()[5] {
+            b'3' => (0, -1),
+            b'1' => (0, 1),
+            b'2' => (-1, 0),
+            b'0' => (1, 0),
+            _ => panic!(),
+        };
+        let dist = isize::from_str_radix(&dig.colour[0..5], 16).unwrap();
+        let old_pos = pos;
+        pos.0 += dist * inc.0;
+        pos.1 += dist * inc.1;
+        min_x = min_x.min(pos.0);
+        max_x = max_x.max(pos.0);
+        min_y = min_y.min(pos.1);
+        max_y = max_y.max(pos.1);
+        y_values.insert(pos.1);
+
+        if inc.0 == 0 {
+            edges.push((old_pos,pos));
+        }
+    }
+    assert_eq!(pos, (0, 0));
+    let y_values = y_values.into_iter().collect::<Vec<_>>();
+
+    let mut dug = 0;
+
+    let mut num_inside_in_row = 0;
+    let mut last_y = 0;
+    for y in y_values.into_iter() {
+        // Add up the rows between the previous and current y we've considered
+        dug += num_inside_in_row * (y - last_y - 1);
+
+        num_inside_in_row = 0;
+        last_y = y;
+
+        let mut row_edges: Vec<_> = edges.iter()
+            .filter(|e| (e.0.1.min(e.1.1) <= y &&
+                         e.0.1.max(e.1.1) >= y))
+            .map(|e| {
+                let ymin = e.0.1.min(e.1.1);
+                let ymax = e.0.1.max(e.1.1);
+                let x = e.0.0;
+                if ymin == y {
+                    (x, EdgeType::Down)
+                } else if ymax == y {
+                    (x, EdgeType::Up)
+                } else {
+                    (x, EdgeType::Cross)
+                }
+            })
+            .collect();
+        row_edges.sort();
+
+        let mut inside = false;
+        // Some(x value at start of horizontal edge)
+        let mut start_inside = None;
+
+        // State for tracking current row
+        let mut hor_start = None;
+        let mut row_inside_start = None;
+
+        for (x, et) in row_edges {
+            // First work out what will happen for the rows below
+            match et {
+                EdgeType::Up => {
+                    // Ignore, as we're working just below the horizontal line.
+                }
+                EdgeType::Down |
+                EdgeType::Cross => {
+                    // Crossing from inside 
+                    if inside {
+                        num_inside_in_row += x - start_inside.take().unwrap() + 1;
+                        inside = false;
+                    } else {
+                        assert!(start_inside.is_none());
+                        start_inside = Some(x);
+                        inside = true;
+                    }
+                }
+            }
+
+            // Now handle the current row
+            match (et, hor_start, row_inside_start) {
+                (EdgeType::Cross, None, None) => {
+                    // Cross from outside to inside
+                    row_inside_start = Some(x);
+                }
+                (EdgeType::Cross, None, Some(start)) => {
+                    // Cross from inside to outside
+                    dug += x - start + 1;
+                    row_inside_start = None;
+                }
+                (EdgeType::Cross, Some(_hstart), _) => {
+                    // Can't have a crossing inside a horizontal run.
+                    panic!();
+                }
+                (EdgeType::Up, None, None) => {
+                    // Start of horizontal run, and outside
+                    hor_start = Some(x);
+                }
+                (EdgeType::Down, None, None) => {
+                    // Start of horizontal run, crossing to inside
+                    hor_start = Some(x);
+                    row_inside_start = Some(x);
+                }
+                (EdgeType::Up, Some(hstart), None) => {
+                    // end of a horizontal run, otherwise outside
+                    dug += x - hstart + 1;
+                    hor_start = None;
+                }
+                (EdgeType::Up, None, Some(start)) => {
+                    // Start of horizontal run, and we're inside
+                    // Add previous bit of inside
+                    dug += x - start;
+                    hor_start = Some(x);
+                }
+                (EdgeType::Down, None, Some(start)) => {
+                    // Start of horizontal run, and we were inside
+                    // Add previous bit of inside
+                    dug += x - start;
+                    row_inside_start = None;
+                    hor_start = Some(x);
+                }
+                (EdgeType::Up, Some(hstart), Some(_start)) => {
+                    // End of horizontal edge, staying inside
+                    dug += x - hstart + 1;
+                    hor_start = None;
+                    // Start new inside section, as we've alreayd covered
+                    // up to here.
+                    row_inside_start = Some(x+1);
+                }
+                (EdgeType::Down, Some(hstart), None) => {
+                    // End of horizontal run, were outside but now inside.
+                    dug += x - hstart + 1;
+                    hor_start = None;
+                    row_inside_start = Some(x+1);
+                }
+                (EdgeType::Down, Some(hstart), Some(_start)) => {
+                    // End of horizontal run, were inside but now outside
+                    dug += x - hstart + 1;
+                    hor_start = None;
+                    row_inside_start = None;
+                }
+            }
+        }
+        assert!(start_inside.is_none());
+        assert!(row_inside_start.is_none());
+        assert!(!inside);
+    }
+    dug
 }}
 
 #[test]
@@ -164,7 +331,15 @@ U 2 (#7a21e3)"#;
     let data = parse_input(&tests);
 
     assert_eq!(part1(&data), 62);
-//    assert_eq!(part2(&data), 0);
+
+    let test2_sq = r#"R 0 (#000020)
+R 0 (#000021)
+R 0 (#000022)
+R 0 (#000023)"#;
+    let test2_sq_data = parse_input(&test2_sq);
+    assert_eq!(part2(&test2_sq_data), 9);
+
+    assert_eq!(part2(&data), 952408144115);
 }
 
 fn main() -> std::io::Result<()>{
