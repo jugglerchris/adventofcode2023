@@ -1,4 +1,4 @@
-use std::{collections::HashMap, str::FromStr};
+use std::{collections::HashMap, str::FromStr, ops::Range};
 
 #[allow(unused)]
 use adventofcode2023::{get_input,parse_lines,parse_list,regex_parser,timeit};
@@ -189,9 +189,152 @@ fn part1(data: &Data) -> Value {
     }
     result
 }}
+
+#[derive(Clone, Debug)]
+struct Ranges {
+    x: Range<Value>,
+    m: Range<Value>,
+    a: Range<Value>,
+    s: Range<Value>,
+}
+
+impl Default for Ranges {
+    fn default() -> Self {
+        let defrange = 1..4001;
+        Self {
+            x: defrange.clone(),
+            m: defrange.clone(),
+            a: defrange.clone(),
+            s: defrange,
+        }
+    }
+}
+
+impl Ranges {
+    fn get(&self, field: FieldID) -> &Range<Value> {
+        match field {
+            FieldID::X => &self.x,
+            FieldID::M => &self.m,
+            FieldID::A => &self.a,
+            FieldID::S => &self.s,
+        }
+    }
+    // Returns true if it changed the value
+    fn set_min(&mut self, field: FieldID, value: Value) {
+        let f = match field {
+            FieldID::X => &mut self.x,
+            FieldID::M => &mut self.m,
+            FieldID::A => &mut self.a,
+            FieldID::S => &mut self.s,
+        };
+        f.start = f.start.max(value);
+    }
+    // Returns true if it changed the value
+    fn set_max(&mut self, field: FieldID, value: Value) {
+        let f = match field {
+            FieldID::X => &mut self.x,
+            FieldID::M => &mut self.m,
+            FieldID::A => &mut self.a,
+            FieldID::S => &mut self.s,
+        };
+        f.end = f.end.min(value+1);
+    }
+    fn is_empty(&self) -> bool {
+        self.x.is_empty() ||
+            self.m.is_empty() ||
+            self.a.is_empty() ||
+            self.s.is_empty()
+    }
+}
+
+struct Workitem {
+    rule: WorkflowID,
+    ranges: Ranges,
+}
+
+struct Jobs {
+    jobs: Vec<Workitem>,
+}
+
+impl Jobs {
+    fn push(&mut self, workitem: Workitem) {
+        if !workitem.ranges.is_empty() {
+            self.jobs.push(workitem);
+        }
+    }
+    fn pop(&mut self) -> Option<Workitem> {
+        self.jobs.pop()
+    }
+}
+
 timeit!{
 fn part2(data: &Data) -> usize {
-    unimplemented!()
+    let mut results = Vec::new();
+    let mut jobs = Jobs {
+        jobs: vec![
+            Workitem {
+                rule: WorkflowID::Named("in".into()),
+                ranges: Ranges::default(),
+            }
+        ],
+    };
+
+    while let Some(item) = jobs.pop() {
+        let wf_name = match item.rule {
+            WorkflowID::Reject => {
+                continue;
+            }
+            WorkflowID::Accept => {
+                results.push(item.ranges);
+                continue;
+            }
+            WorkflowID::Named(name) => {
+                name
+            }
+        };
+        let mut ranges = item.ranges;
+        let workflow = data.workflows.get(&wf_name).unwrap();
+        for rule in &workflow.rules {
+            match rule {
+                Rule::Lt { field, value, target } => {
+                    let mut ranges_br = ranges.clone();
+                    ranges_br.set_max(*field, value-1);
+                    if !ranges_br.is_empty() {
+                        jobs.push(Workitem {
+                            rule: target.clone(),
+                            ranges: ranges_br
+                        });
+                    }
+                    ranges.set_min(*field, *value);
+                }
+                Rule::Gt { field, value, target } => {
+                    let mut ranges_br = ranges.clone();
+                    ranges_br.set_min(*field, value+1);
+                    if !ranges_br.is_empty() {
+                        jobs.push(Workitem {
+                            rule: target.clone(),
+                            ranges: ranges_br
+                        });
+                    }
+                    ranges.set_max(*field, *value);
+                }
+                Rule::Jmp(target) => {
+                    jobs.push(Workitem {
+                        rule: target.clone(),
+                        ranges: ranges.clone(),
+                    });
+                }
+            }
+        }
+    }
+    results.into_iter()
+        .map(|r| {
+             (r.x.end - r.x.start) * 
+             (r.m.end - r.m.start) * 
+             (r.a.end - r.a.start) * 
+             (r.s.end - r.s.start)
+        })
+        .sum()
 }}
 
 #[test]
@@ -216,7 +359,7 @@ hdj{m>838:A,pv}
     let data = parse_input(&tests);
 
     assert_eq!(part1(&data), 19114);
-//    assert_eq!(part2(&data), 0);
+    assert_eq!(part2(&data), 167409079868000);
 }
 
 fn main() -> std::io::Result<()>{
