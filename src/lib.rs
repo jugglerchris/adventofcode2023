@@ -64,6 +64,14 @@ pub fn parse_lines<T:FromStr+Debug>(data: &str) -> Vec<T>
         .collect()
 }
 
+pub fn parse_list<T:FromStr+Debug>(data: &str, delim: &str) -> Vec<T>
+   where <T as FromStr>::Err: Debug
+{
+    data.split(delim)
+        .map(|s| s.parse().expect("Failed to parse"))
+        .collect()
+}
+
 fn get_input_str(s: &str) -> io::Result<String> {
     let filename = s;
     let mut f = File::open(&filename)?;
