@@ -13,7 +13,8 @@ enum ModuleType {
     },
     Broadcast {
     },
-    Rx {}
+    Rx {
+    },
 }
 
 impl Module {
@@ -84,11 +85,12 @@ struct Machine {
     modules: HashMap<String, Module>,
     pulse_true: usize,
     pulse_false: usize,
-    finished: bool,
+    prods: usize,
+    towatch: HashMap<String, usize>,
 }
 
 impl Machine {
-    pub fn from(data: &Data) -> Machine {
+    pub fn from(data: &Data, output: Option<&str>) -> Machine {
         let mut modules: Vec<(String, Module)> =
             data.iter()
                 .map(|m| (m.name.clone(), m.clone()))
@@ -114,17 +116,33 @@ impl Machine {
                 });
         }
 
-        modules.push(("rx".into(), Module {
-            name: "rx".into(),
-            module: ModuleType::Rx {  },
-            outputs: Default::default(),
-        }));
+        let mut towatch = Default::default();
+        let mut modules: HashMap<String, Module> = modules.into_iter().collect();
+        if let Some(output) = output {
+            let send_to_rx = modules.iter()
+                                    .filter(|(_n, m)| m.outputs.contains(&String::from(output)))
+                                    .map(|(n, _)| n)
+                                    .collect::<Vec<_>>();
+            assert_eq!(send_to_rx.len(), 1);
+            let send_to_rx_2 = modules.iter()
+                                      .filter(|(_n, m)| m.outputs.contains(send_to_rx[0]))
+                                      .map(|(n, _)| n.clone())
+                                      .collect::<Vec<_>>();
+
+            for n in &send_to_rx_2 {
+                modules.get_mut(n).unwrap().module = ModuleType::Rx {};
+            }
+            towatch = send_to_rx_2.into_iter()
+                                 .map(|s| (s.clone(), 0))
+                                 .collect();
+        }
 
         Machine {
-            modules: modules.into_iter().collect(),
+            modules,
             pulse_true: 0,
             pulse_false: 0,
-            finished: false,
+            prods: 0,
+            towatch,
         }
     }
 
@@ -133,6 +151,7 @@ impl Machine {
     }
 
     pub fn prod(&mut self) {
+        self.prods += 1;
         let mut pulses = VecDeque::new();
         pulses.push_back(("button".to_string(), "broadcaster".to_string(), false));
 
@@ -143,7 +162,7 @@ impl Machine {
             } else {
                 self.pulse_false += 1;
             }
-            let mut m = self.modules.get_mut(&dest);
+            let m = self.modules.get_mut(&dest);
             if let Some(m) = m {
                 let newpulse = match &mut m.module {
                     ModuleType::FlipFlop { state } => {
@@ -163,9 +182,16 @@ impl Machine {
                     ModuleType::Broadcast { } => {
                         Some(val)
                     }
-                    ModuleType::Rx {} => {
+                    ModuleType::Rx { } => {
                         if !val {
-                            self.finished = true;
+                            match self.towatch.get_mut(&dest) {
+                                Some(v) => {
+                                    if *v == 0 {
+                                        *v = self.prods;
+                                    }
+                                }
+                                None => todo!(),
+                            }
                         }
                         None
                     }
@@ -182,7 +208,7 @@ impl Machine {
 
 timeit!{
 fn part1(data: &Data) -> usize {
-    let mut machine = Machine::from(data);
+    let mut machine = Machine::from(data, None);
 
     for _ in 0..1000 {
         machine.prod();
@@ -191,17 +217,17 @@ fn part1(data: &Data) -> usize {
 }}
 timeit!{
 fn part2(data: &Data) -> usize {
-    let mut machine = Machine::from(data);
-    let mut count = 0;
+    let mut machine = Machine::from(data, Some("rx"));
 
-    while !machine.finished {
+    loop {
         machine.prod();
-        count += 1;
-        if (count % 10000) == 0 {
-            dbg!(count);
+
+        let counts = machine.towatch.values().cloned().collect::<Vec<_>>();
+        let tot = counts.into_iter().product();
+        if tot > 0 {
+            return tot;
         }
     }
-    count
 }}
 
 #[test]
