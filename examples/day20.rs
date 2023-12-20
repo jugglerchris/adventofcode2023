@@ -12,7 +12,8 @@ enum ModuleType {
         inputs: HashMap<String, bool>,
     },
     Broadcast {
-    }
+    },
+    Rx {}
 }
 
 impl Module {
@@ -83,6 +84,7 @@ struct Machine {
     modules: HashMap<String, Module>,
     pulse_true: usize,
     pulse_false: usize,
+    finished: bool,
 }
 
 impl Machine {
@@ -112,10 +114,17 @@ impl Machine {
                 });
         }
 
+        modules.push(("rx".into(), Module {
+            name: "rx".into(),
+            module: ModuleType::Rx {  },
+            outputs: Default::default(),
+        }));
+
         Machine {
             modules: modules.into_iter().collect(),
             pulse_true: 0,
             pulse_false: 0,
+            finished: false,
         }
     }
 
@@ -128,6 +137,7 @@ impl Machine {
         pulses.push_back(("button".to_string(), "broadcaster".to_string(), false));
 
         while let Some((src, dest, val)) = pulses.pop_front() {
+            //eprintln!("{src} => {dest} {val}");
             if val {
                 self.pulse_true += 1;
             } else {
@@ -139,6 +149,7 @@ impl Machine {
                     ModuleType::FlipFlop { state } => {
                         if !val {
                             *state = !*state;
+//                            eprintln!(" FF {dest} => {}", *state);
                             Some(*state)
                         } else {
                             None
@@ -151,6 +162,12 @@ impl Machine {
                     }
                     ModuleType::Broadcast { } => {
                         Some(val)
+                    }
+                    ModuleType::Rx {} => {
+                        if !val {
+                            self.finished = true;
+                        }
+                        None
                     }
                 };
                 if let Some(val) = newpulse {
@@ -174,7 +191,17 @@ fn part1(data: &Data) -> usize {
 }}
 timeit!{
 fn part2(data: &Data) -> usize {
-    unimplemented!()
+    let mut machine = Machine::from(data);
+    let mut count = 0;
+
+    while !machine.finished {
+        machine.prod();
+        count += 1;
+        if (count % 10000) == 0 {
+            dbg!(count);
+        }
+    }
+    count
 }}
 
 #[test]
