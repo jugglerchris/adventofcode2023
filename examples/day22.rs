@@ -1,4 +1,4 @@
-use std::collections::{HashSet, HashMap};
+use std::collections::{HashSet, HashMap, hash_map::Entry};
 
 #[allow(unused)]
 use adventofcode2023::{get_input,parse_lines,regex_parser,timeit};
@@ -104,9 +104,64 @@ timeit!{
 fn part1(data: &Data) -> usize {
     do_part1(data)
 }}
+fn do_part2(data: &Data) -> usize {
+    let mut bricks = data.bricks.clone();
+    bricks.sort_by_key(|brick| brick.pos0.2.min(brick.pos1.2));
+
+    // Map from brick to bricks it's resting on
+    let mut under: HashMap<usize, HashSet<usize>> = HashMap::new();
+
+    let mut space = HashMap::new();
+    for (i, brick) in bricks.iter().enumerate() {
+        let brick_z = brick.pos0.2.min(brick.pos1.2);
+        let mut drop_by = 1;
+        while brick_z > drop_by && can_drop(brick, &space, drop_by) {
+            drop_by += 1;
+        }
+        drop_by -= 1;
+
+        // Put the brick in place
+        let mut resting_on = HashSet::new();
+        for pos in brick.poses() {
+            space.insert((pos.0, pos.1, pos.2 - drop_by), i);
+            if let Some(blockno) = space.get(&(pos.0, pos.1, pos.2-drop_by-1)) {
+                if *blockno != i {
+                    resting_on.insert(*blockno);
+                }
+            }
+        }
+        under.insert(i, resting_on);
+    }
+    (0..bricks.len())
+        .map(|i| chain_len(&under, i))
+        .sum()
+}
+
+fn chain_len(under: &HashMap<usize, HashSet<usize>>, i: usize) -> usize {
+    let mut result = 0;
+    let mut under = under.clone();
+
+    let mut to_remove = vec![i];
+    while let Some(blockno) = to_remove.pop() {
+        under.iter_mut()
+            .for_each(|(k, v)| {
+                if v.remove(&blockno) {
+                    // k was resting on us.
+                    if v.is_empty() {
+                        // ...and is now falling
+                        to_remove.push(*k);
+                        result += 1;
+                    }
+                }
+            });
+    }
+
+    result
+}
+
 timeit!{
 fn part2(data: &Data) -> usize {
-    unimplemented!()
+    do_part2(data)
 }}
 
 #[test]
@@ -121,7 +176,7 @@ fn test() {
     let data = parse_input(&tests);
 
     assert_eq!(part1(&data), 5);
-//    assert_eq!(part2(&data), 0);
+    assert_eq!(part2(&data), 7);
 }
 
 fn main() -> std::io::Result<()>{
