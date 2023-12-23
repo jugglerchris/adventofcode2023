@@ -131,6 +131,7 @@ impl Data {
         }
     }
 
+    #[allow(unused)]
     fn print(&self) {
         for row in &self.field {
             for spc in row {
@@ -234,19 +235,19 @@ fn part2(data: &Data) -> usize {
 type Pos = (usize, usize);
 
 #[derive(Hash, Eq, PartialEq, Copy, Clone, Ord, PartialOrd)]
-struct Edge(Pos, Pos, usize);
+struct Edge(usize, usize, usize);
 
 impl Debug for Edge {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Edge(({},{})->({},{}) len {})",
-            self.0.0, self.0.1,
-            self.1.0, self.1.1,
+        write!(f, "Edge(({})->({}) len {})",
+            self.0,
+            self.1,
             self.2)
     }
 }
 
 impl Edge {
-    pub fn new(pos1: Pos, pos2: Pos, len: usize) -> Edge {
+    pub fn new(pos1: usize, pos2: usize, len: usize) -> Edge {
         if pos1 > pos2 {
             Edge(pos2, pos1, len)
         } else {
@@ -255,9 +256,11 @@ impl Edge {
     }
 }
 
+type GPos = usize;
+
 struct Graph {
-    start: Pos,
-    finish: Pos,
+    start: GPos,
+    finish: GPos,
     edges: BTreeSet<Edge>,
 }
 
@@ -265,7 +268,9 @@ impl Graph {
     pub fn new(data: &Data) -> Graph {
         // pos, next_pos
         let mut to_visit = vec![((1, 0), (1, 1))];
-        let mut nodes = HashSet::from([(1, 0)]);
+
+        let mut nodes = vec![(1, 0)];
+        let mut nodemap = HashMap::from([((1, 0), 0)]);
         let mut edges = BTreeSet::new();
 
         while let Some((start, mut next)) = to_visit.pop() {
@@ -278,172 +283,27 @@ impl Graph {
                 next_poses = data.next_pos_from(prev, next);
                 len += 1;
             }
-            edges.insert(Edge::new(start, next, len));
-            if !nodes.contains(&next) {
-                nodes.insert(next);
+            if !nodemap.contains_key(&next) {
+                nodemap.insert(next, nodes.len());
+                nodes.push(next);
                 // New node, so start a new trace.
                 for next_pos in next_poses {
                     to_visit.push((next, next_pos));
                 }
             }
+            edges.insert(Edge::new(*nodemap.get(&start).unwrap(), *nodemap.get(&next).unwrap(), len));
         }
-
-        /*
-        {
-            let mut data: HashMap<Pos, Vec<Edge>> = HashMap::new();
-            for edge in &edges {
-                for pos in [edge.0, edge.1] {
-                    data.entry(pos)
-                        .or_default()
-                        .push(*edge);
-                }
-            }
-            let mut vdata = data.into_iter().collect::<Vec<_>>();
-            vdata.sort_by_key(|x| x.1.len());
-            for (p, es) in vdata {
-                println!("({},{}): {} edges", p.0, p.1, es.len());
-            }
-        }
-        */
 
         Graph {
-            start: (1, 0),
-            finish: (data.field[0].len() - 2, data.field.len() - 1),
+            start: 0,
+            finish: *nodemap.get(&(data.field[0].len() - 2, data.field.len() - 1)).unwrap(),
             edges
         }
     }
 
-    pub fn tot_lens(&self) -> usize {
-        self.edges
-            .iter()
-            .map(|e| e.2)
-            .sum()
-    }
-
-    pub fn minimize(&mut self) {
-        'l: loop {
-            let mut edges = self.edges.iter().cloned().collect::<Vec<_>>();
-            // Shortest first
-            edges.sort_by_key(|e| e.2);
-            dbg!(&edges);
-
-            for edge in edges {
-                if self.can_remove(&edge) {
-                    eprintln!("Removing {:?}", edge);
-                    self.edges.remove(&edge);
-                    continue 'l;
-                }
-            }
-            break;
-        }
-        dbg!(&self.edges);
-    }
-
-    fn can_remove(&self, edge: &Edge) -> bool {
-        let edges0 =
-            self.edges
-                .iter()
-                .filter(|e| e.0 == edge.0 || e.1 == edge.0)
-                .count();
-        let edges1 =
-            self.edges
-                .iter()
-                .filter(|e| e.0 == edge.1 || e.1 == edge.1)
-                .count();
-        if edges0 == 1 {
-            if edge.0 == self.start || edge.0 == self.finish {
-                return false;
-            }
-            // Dead end
-            return true;
-        }
-        if edges1 == 1 {
-            if edge.1 == self.start || edge.1 == self.finish {
-                return false;
-            }
-            // Dead end
-            return true;
-        }
-
-        let mut edges = self.edges.clone();
-        edges.remove(&edge);
-
-        Self::is_connected(&edges, edge.0, edge.1)
-    }
-
-    fn is_connected(edges: &BTreeSet<Edge>, start: (usize, usize), finish: (usize, usize)) -> bool {
-        let mut found = BTreeSet::from([start]);
-
-        if start == finish {
-            return true;
-        }
-
-        loop {
-            let mut added = false;
-            for edge in edges {
-                let have0 = found.contains(&edge.0);
-                let have1 = found.contains(&edge.1);
-                match (have0, have1) {
-                    (true, true) => (),
-                    (true, false) => {
-                        if edge.1 == finish {
-                            return true;
-                        }
-                        found.insert(edge.1);
-                        added = true;
-                    }
-                    (false, true) => {
-                        if edge.0 == finish {
-                            return true;
-                        }
-                        found.insert(edge.0);
-                        added = true;
-                    }
-                    (false, false) => ()
-                }
-            }
-            if !added {
-                return false;
-            }
-        }
-    }
-
-    fn pathlen(&self) -> usize {
-        let mut pos = self.start;
-        let mut dist = 0;
-        let mut edges = self.edges.clone();
-        while pos != self.finish {
-            let mut connections = Vec::new();
-            for edge in &edges {
-                if edge.0 == pos || edge.1 == pos {
-                    connections.push(*edge);
-                }
-            }
-            for edge in &connections {
-                edges.remove(edge);
-            }
-            dbg!(&connections);
-            let others = connections.into_iter()
-                .map(|e| if e.0 == pos {
-                     (e.1, e.2)
-                } else {
-                     (e.0, e.2)
-                })
-                .collect::<Vec<_>>();
-            for (otherpos, len) in others {
-                if Self::is_connected(&edges, otherpos, self.finish) {
-                    pos = otherpos;
-                    dist += len;
-                    break;
-                }
-            }
-        }
-        dist
-    }
-
-    fn do_solve(&mut self, cache: &mut HashMap<(BTreeSet<Edge>, (usize, usize)), Option<(Vec<Pos>, usize)>>, pos: (usize, usize)) -> Option<(Vec<Pos>, usize)> {
+    fn do_solve(&mut self, cache: &mut HashMap<(BTreeSet<Edge>, usize), Option<usize>>, pos: usize) -> Option<usize> {
         if pos == self.finish {
-            return Some((Vec::new(), 0));
+            return Some(0);
         }
         if let Some(v) = cache.get(&(self.edges.clone(), pos)) {
             return v.clone();
@@ -457,14 +317,12 @@ impl Graph {
         for edge in &edges {
             self.edges.remove(edge);
         }
-        let mut best = 0;
-        let mut best_path = None;
+        let mut best = None;
         for edge in &edges {
             let otherpos = if edge.0 == pos { edge.1 } else { edge.0 };
-            if let Some((path, result)) = self.do_solve(cache, otherpos) {
-                if result + edge.2 > best {
-                    best = result + edge.2;
-                    best_path = Some(path);
+            if let Some(result) = self.do_solve(cache, otherpos) {
+                if result + edge.2 > best.unwrap_or(0) {
+                    best = Some(result + edge.2);
                 }
             }
         }
@@ -472,20 +330,13 @@ impl Graph {
         for edge in edges {
             self.edges.insert(edge);
         }
-        let result = if let Some(mut best_path) = best_path {
-            best_path.push(pos);
-            Some((best_path, best))
-        } else {
-            None
-        };
 
-        cache.insert((self.edges.clone(), pos), result.clone());
-        result
+        cache.insert((self.edges.clone(), pos), best.clone());
+        best
     }
 
     pub fn solve(&mut self) -> usize {
-        if let Some((path, best)) = self.do_solve(&mut Default::default(), self.start) {
-            //dbg!(path);
+        if let Some(best) = self.do_solve(&mut Default::default(), self.start) {
             best
         } else {
             panic!();
@@ -501,6 +352,7 @@ fn do_part2(data: &Data) -> usize {
     graph.solve()
 }
 
+#[allow(unused)]
 fn do_print(state: &WalkState, data: &Data) {
     println!("---");
     for (y, row) in data.field.iter().enumerate() {
