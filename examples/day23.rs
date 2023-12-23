@@ -1,4 +1,4 @@
-use std::{collections::{BTreeSet, HashSet, HashMap}, fmt::Debug};
+use std::{collections::{BTreeSet, HashMap}, fmt::Debug};
 
 #[allow(unused)]
 use adventofcode2023::{get_input,parse_lines,regex_parser,timeit};
@@ -234,34 +234,12 @@ fn part2(data: &Data) -> usize {
 
 type Pos = (usize, usize);
 
-#[derive(Hash, Eq, PartialEq, Copy, Clone, Ord, PartialOrd)]
-struct Edge(usize, usize, usize);
-
-impl Debug for Edge {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Edge(({})->({}) len {})",
-            self.0,
-            self.1,
-            self.2)
-    }
-}
-
-impl Edge {
-    pub fn new(pos1: usize, pos2: usize, len: usize) -> Edge {
-        if pos1 > pos2 {
-            Edge(pos2, pos1, len)
-        } else {
-            Edge(pos1, pos2, len)
-        }
-    }
-}
-
 type GPos = usize;
 
 struct Graph {
     start: GPos,
     finish: GPos,
-    edges: BTreeSet<Edge>,
+    nodes: Vec<Vec<(GPos, usize)>>,
 }
 
 impl Graph {
@@ -269,9 +247,8 @@ impl Graph {
         // pos, next_pos
         let mut to_visit = vec![((1, 0), (1, 1))];
 
-        let mut nodes = vec![(1, 0)];
+        let mut nodes = vec![Vec::new()];
         let mut nodemap = HashMap::from([((1, 0), 0)]);
-        let mut edges = BTreeSet::new();
 
         while let Some((start, mut next)) = to_visit.pop() {
             let mut next_poses = data.next_pos_from(start, next);
@@ -285,58 +262,52 @@ impl Graph {
             }
             if !nodemap.contains_key(&next) {
                 nodemap.insert(next, nodes.len());
-                nodes.push(next);
+                nodes.push(Vec::new());
                 // New node, so start a new trace.
                 for next_pos in next_poses {
                     to_visit.push((next, next_pos));
                 }
             }
-            edges.insert(Edge::new(*nodemap.get(&start).unwrap(), *nodemap.get(&next).unwrap(), len));
+            let pos0 = *nodemap.get(&start).unwrap();
+            let pos1 = *nodemap.get(&next).unwrap();
+            nodes[pos0].push((pos1, len));
+            nodes[pos1].push((pos0, len));
         }
 
         Graph {
             start: 0,
             finish: *nodemap.get(&(data.field[0].len() - 2, data.field.len() - 1)).unwrap(),
-            edges
+            nodes
         }
     }
 
-    fn do_solve(&mut self, cache: &mut HashMap<(BTreeSet<Edge>, usize), Option<usize>>, pos: usize) -> Option<usize> {
+    fn do_solve(&self, seen: u64, cache: &mut HashMap<(u64, usize), Option<usize>>, pos: usize) -> Option<usize> {
         if pos == self.finish {
             return Some(0);
         }
-        if let Some(v) = cache.get(&(self.edges.clone(), pos)) {
+        if let Some(v) = cache.get(&(seen, pos)) {
             return v.clone();
         }
 
-        let edges = self.edges.iter()
-                        .filter(|&e| e.0 == pos || e.1 == pos)
-                        .cloned()
-                        .collect::<Vec<Edge>>();
-        // Remove all the edges
-        for edge in &edges {
-            self.edges.remove(edge);
-        }
         let mut best = None;
-        for edge in &edges {
-            let otherpos = if edge.0 == pos { edge.1 } else { edge.0 };
-            if let Some(result) = self.do_solve(cache, otherpos) {
-                if result + edge.2 > best.unwrap_or(0) {
-                    best = Some(result + edge.2);
+        for &(otherpos, len) in &self.nodes[pos] {
+            if seen & (1<<otherpos) != 0 {
+                continue;
+            }
+            if let Some(result) = self.do_solve(seen | (1<<otherpos), cache, otherpos) {
+                if result + len > best.unwrap_or(0) {
+                    best = Some(result + len);
                 }
             }
         }
-        // Put the edges back
-        for edge in edges {
-            self.edges.insert(edge);
-        }
 
-        cache.insert((self.edges.clone(), pos), best.clone());
+        cache.insert((seen, pos), best.clone());
         best
     }
 
     pub fn solve(&mut self) -> usize {
-        if let Some(best) = self.do_solve(&mut Default::default(), self.start) {
+        assert!(self.nodes.len() <= 64);
+        if let Some(best) = self.do_solve(0, &mut Default::default(), self.start) {
             best
         } else {
             panic!();
