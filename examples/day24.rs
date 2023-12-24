@@ -13,6 +13,168 @@ struct Stone {
     vel: Vec3,
 }
 
+#[derive(Copy, Clone, Hash, Debug)]
+struct Pos {
+    c: [i64; 3],
+}
+
+impl Div<i64> for Pos {
+    type Output = Pos;
+
+    fn div(self, rhs: i64) -> Self::Output {
+        dbg!((self.c[0] % rhs, 
+              self.c[1] % rhs, 
+              self.c[2] % rhs));
+        Pos {
+            c: [
+                self.c[0] / rhs,
+                self.c[1] / rhs,
+                self.c[2] / rhs,
+            ],
+        }
+    }
+}
+
+impl Mul<i64> for Pos {
+    type Output = Pos;
+
+    fn mul(self, rhs: i64) -> Self::Output {
+        Pos {
+            c: [
+                self.c[0] * rhs,
+                self.c[1] * rhs,
+                self.c[2] * rhs,
+            ],
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+struct PosF {
+    c: [f64; 3],
+}
+
+impl Display for Pos {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "P({},{},{})",
+            self.c[0],
+            self.c[1],
+            self.c[2])
+    }
+}
+
+impl Sub<Pos> for Pos {
+    type Output = Pos;
+
+    fn sub(self, rhs: Pos) -> Self::Output {
+        Pos {
+            c: [
+                self.c[0] - rhs.c[0],
+                self.c[1] - rhs.c[1],
+                self.c[2] - rhs.c[2],
+            ],
+        }
+    }
+}
+
+impl PosF {
+    pub fn cross(&self, other: PosF) -> PosF {
+        PosF {
+            c: [
+                self.c[1] * other.c[2] - self.c[2] * other.c[1],
+                self.c[2] * other.c[0] - self.c[0] * other.c[2],
+                self.c[0] * other.c[1] - self.c[1] * other.c[0],
+            ],
+        }
+    }
+    fn dot(&self, other: PosF) -> f64 {
+        self.c[0] as f64 * other.c[0] as f64 +
+            self.c[1] as f64 * other.c[1] as f64 +
+            self.c[2] as f64 * other.c[2] as f64
+    }
+
+    fn len(&self) -> f64 {
+        let a = self.c[0];
+        let b = self.c[1];
+        let c = self.c[2];
+
+        (a*a + b*b + c*c).sqrt()
+    }
+}
+
+impl Pos {
+    pub fn cross(&self, other: Pos) -> PosF {
+        self.as_f().cross(other.as_f())
+    }
+
+    fn as_f(&self) -> PosF {
+        PosF {
+            c: [
+                self.c[0] as f64,
+                self.c[1] as f64,
+                self.c[2] as f64,
+            ],
+        }
+    }
+
+    fn dot(&self, other: Pos) -> i64 {
+        self.c[0] * other.c[0] +
+            self.c[1] * other.c[1] +
+            self.c[2] * other.c[2]
+    }
+
+    fn len(&self) -> f64 {
+        let a = self.c[0] as f64;
+        let b = self.c[1] as f64;
+        let c = self.c[2] as f64;
+
+        (a*a + b*b + c*c).sqrt()
+    }
+}
+
+impl Stone {
+    fn at(&self, t: Coord) -> Pos {
+        Pos {
+            c: [
+                (self.pos[0] + self.vel[0] * t) as i64,
+                (self.pos[1] + self.vel[1] * t) as i64,
+                (self.pos[2] + self.vel[2] * t) as i64,
+            ]
+        }
+    }
+
+    fn vel(&self) -> Pos {
+        Pos {
+            c: [
+                self.vel[0] as i64,
+                self.vel[1] as i64,
+                self.vel[2] as i64,
+            ],
+        }
+    }
+    fn pos(&self) -> Pos {
+        Pos {
+            c: [
+                self.pos[0] as i64,
+                self.pos[1] as i64,
+                self.pos[2] as i64,
+            ],
+        }
+    }
+
+    fn dist(&self, pos: Pos, vel: Pos) -> f64 {
+//        eprintln!("Dist pos={pos} vel={vel}");
+        let perpendicular = self.vel().cross(vel);
+
+        let diff = pos - self.pos();
+
+        let dot = diff.as_f().dot(perpendicular);
+//        eprintln!("perp={perpendicular} diff={diff} dot={dot}");
+
+        dot * perpendicular.len()
+    }
+}
+
 regex_parser!(parse_stone: Stone {
     S = r#"(-?\d+), (-?\d+), (-?\d+) @ *(-?\d+), *(-?\d+), *(-?\d+)$"# =>
         |x: Coord, y: Coord, z: Coord, vx: Coord, vy: Coord, vz: Coord|
@@ -163,8 +325,8 @@ impl PartialEq<Rat> for Rat {
 
 impl PartialOrd<Rat> for Rat {
     fn partial_cmp(&self, other: &Rat) -> Option<std::cmp::Ordering> {
-        println!("{self} cmp {other}");
-        println!("  sub = {}", *other - *self);
+//        println!("{self} cmp {other}");
+//        println!("  sub = {}", *other - *self);
         if self == other {
             Some(Ordering::Equal)
         } else if (*other - *self).is_pos() {
@@ -203,59 +365,124 @@ fn will_collide(s1: &Stone, s2: &Stone, c1: Coord, c2: Coord) -> bool {
     // y = m1*x + b1 = m2*x + b2
     //   => (m1 - m2)*x = (b2 - b1)
     //   => x = (b2 - b1) / (m1 - m2)
-    println!("will_collide {s1:?} {s2:?}");
+//    println!("will_collide {s1:?} {s2:?}");
     let m1 = Rat::from(s1.vel[1]) / Rat::from(s1.vel[0]);
     let m2 = Rat::from(s2.vel[1]) / Rat::from(s2.vel[0]);
 
-    println!("m1 = {m1}, m2 = {m2}");
+//    println!("m1 = {m1}, m2 = {m2}");
 
     // y = m*x + b
     // => b = y - (m*x)
-    println!("y = {}", Rat::from(s1.pos[1]));
-    println!("m1*{} = {}", s1.pos[0], m1 * s1.pos[0]);
+//    println!("y = {}", Rat::from(s1.pos[1]));
+//    println!("m1*{} = {}", s1.pos[0], m1 * s1.pos[0]);
     let b1 = Rat::from(s1.pos[1]) - m1 * s1.pos[0];
     let b2 = Rat::from(s2.pos[1]) - m2 * s2.pos[0];
 
-    println!("b1 = {b1}, b2 = {b2}");
+//    println!("b1 = {b1}, b2 = {b2}");
 
     // Solve for matching x
     if m1 == m2 {
-        println!("m1 == m2, fail");
+//        println!("m1 == m2, fail");
         return false;
     }
     let x = (b2 - b1) / (m1 - m2);
 
     if x < c1 || x > c2 {
-        println!("x out of range ({x})");
+//        println!("x out of range ({x})");
         return false;
     }
     // Solve for y
     let y = m1 * x + b1;
     if y < c1 || y > c2 {
-        println!("y out of range ({y})");
+//        println!("y out of range ({y})");
         return false;
     }
     
     // Now see if it's in the past
     let t1 = (x - Rat::from(s1.pos[0])) / Rat::from(s1.vel[0]);
     if t1 < 0 {
-        println!("s1 in past");
+//        println!("s1 in past");
         return false;
     }
     let t2 = (x - Rat::from(s2.pos[0])) / Rat::from(s2.vel[0]);
     if t2 < 0 {
-        println!("s2 in past");
+//        println!("s2 in past");
         return false;
     }
 
-    println!("  => will collide");
+//    println!("  => will collide");
     return true;
 }
 
 timeit!{
-fn part2(data: &Data) -> usize {
-    unimplemented!()
+fn part2(data: &Data) -> i64 {
+    do_part2(data)
 }}
+
+fn do_part2(data: &Data) -> i64 {
+    // Approach: pick t0 and t1 as times to intercept
+    // hailstones 0 and 1.
+    // Try to optimise t0, t1 to get closest to other hailstones.
+    let mut t0 = 20000;
+    let mut t1 = t0 + 1;
+    let mut inc = t0;
+
+    let s0 = data[0];
+    let s1 = data[1];
+
+    loop {
+        let tries = [
+            (t0 - inc, t1 - inc),
+            (t0 - inc, t1),
+            (t0 - inc, t1 + inc),
+            (t0, t1 - inc),
+            (t0, t1),
+            (t0, t1 + inc),
+            (t0 + inc, t1 - inc),
+            (t0 + inc, t1),
+            (t0 + inc, t1 + inc),
+        ];
+        //dbg!(&tries);
+
+        let dists = tries.iter()
+            .map(|(t0, t1)| {
+                let pos0 = s0.at(*t0);
+                let pos1 = s1.at(*t1);
+                let vel = pos1 - pos0;
+//                eprintln!("pos0={pos0}, pos1={pos1} vel={vel}");
+                data[2..].iter()
+                    .map(|s| {
+                        let d = s.dist(pos0, vel);
+                        d*d
+                    })
+                    .sum::<f64>()
+                        .sqrt()
+            })
+            .collect::<Vec<_>>();
+
+        dbg!(&dists);
+        let (i, best) = dists.into_iter().enumerate().min_by(|a, b| a.1.abs().partial_cmp(&b.1.abs()).unwrap()).unwrap();
+        dbg!((i, best, inc));
+        (t0, t1) = dbg!(tries[i]);
+        inc = inc / 256 * 255;
+        if inc == 0 {
+            inc = 1;
+        }
+
+        if best == 0.0 {
+            break;
+        }
+    }
+
+    let pos_t0 = s0.at(t0);
+    let pos_t1 = s1.at(t1);
+    let vel = (pos_t1 - pos_t0) / ((t1-t0) as i64);
+    eprintln!("points {pos_t0}, {pos_t1} vel={vel}");
+    let pos_0 = pos_t0 - vel * t0 as i64;
+
+    dbg!(pos_0);
+    pos_0.c.into_iter().sum::<i64>()
+}
 
 #[test]
 fn test() {
@@ -267,7 +494,7 @@ fn test() {
     let data = parse_input(&tests);
 
     assert_eq!(do_part1(&data, 7, 27), 2);
-//    assert_eq!(part2(&data), 0);
+    assert_eq!(part2(&data), 47);
 }
 
 fn main() -> std::io::Result<()>{
