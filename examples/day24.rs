@@ -100,6 +100,19 @@ impl PosF {
 
         (a*a + b*b + c*c).sqrt()
     }
+
+    fn norm(&self) -> PosF {
+        let size = (self.c[0]*self.c[0] +
+                    self.c[1]*self.c[1] +
+                    self.c[2]*self.c[2]).sqrt();
+        PosF {
+            c: [
+                self.c[0] / size,
+                self.c[1] / size,
+                self.c[2] / size,
+            ],
+        }
+    }
 }
 
 impl Pos {
@@ -165,6 +178,7 @@ impl Stone {
     fn dist(&self, pos: Pos, vel: Pos) -> f64 {
 //        eprintln!("Dist pos={pos} vel={vel}");
         let perpendicular = self.vel().cross(vel);
+        let perpendicular = perpendicular.norm();
 
         let diff = pos - self.pos();
 
@@ -416,16 +430,16 @@ fn will_collide(s1: &Stone, s2: &Stone, c1: Coord, c2: Coord) -> bool {
 
 timeit!{
 fn part2(data: &Data) -> i64 {
-    do_part2(data)
+    do_part2(data, 200000000000000, 400000000000000)
 }}
 
-fn do_part2(data: &Data) -> i64 {
+fn do_part2(data: &Data, low: i128, high: i128) -> i64 {
     // Approach: pick t0 and t1 as times to intercept
     // hailstones 0 and 1.
     // Try to optimise t0, t1 to get closest to other hailstones.
-    let mut t0 = 20000;
+    let mut t0 = low/2+high/2;
     let mut t1 = t0 + 1;
-    let mut inc = t0;
+    let mut inc = low;
 
     let s0 = data[0];
     let s1 = data[1];
@@ -456,7 +470,6 @@ fn do_part2(data: &Data) -> i64 {
                         d*d
                     })
                     .sum::<f64>()
-                        .sqrt()
             })
             .collect::<Vec<_>>();
 
@@ -464,12 +477,12 @@ fn do_part2(data: &Data) -> i64 {
         let (i, best) = dists.into_iter().enumerate().min_by(|a, b| a.1.abs().partial_cmp(&b.1.abs()).unwrap()).unwrap();
         dbg!((i, best, inc));
         (t0, t1) = dbg!(tries[i]);
-        inc = inc / 256 * 255;
+        inc = inc /2;
         if inc == 0 {
             inc = 1;
         }
 
-        if best == 0.0 {
+        if best < 1.0 {
             break;
         }
     }
@@ -494,7 +507,7 @@ fn test() {
     let data = parse_input(&tests);
 
     assert_eq!(do_part1(&data, 7, 27), 2);
-    assert_eq!(part2(&data), 47);
+    assert_eq!(do_part2(&data, 0, 40), 47);
 }
 
 fn main() -> std::io::Result<()>{
