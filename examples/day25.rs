@@ -50,6 +50,7 @@ impl Data {
         nodes.len()
     }
 
+    #[allow(unused)]
     fn find_group(&self, i: usize) -> Vec<usize> {
         let links = self.nodes.get(&i).unwrap();
 
@@ -63,6 +64,47 @@ impl Data {
             all = all.intersection(&other_all).cloned().collect();
         }
         all.into_iter().collect()
+    }
+
+    #[allow(unused)]
+    fn print_dot(&self) {
+        println!("graph foo {{");
+        for (&n, ls) in self.nodes.iter() {
+            print!("    {}", self.names[n]);
+            for &l in ls {
+                print!(" -- {}", self.names[l]);
+            }
+            println!("");
+        }
+        println!("}}");
+    }
+
+    fn route(&self, n1: usize, n2: usize) -> Option<Vec<usize>> {
+        let mut routes: HashMap<usize, Vec<usize>> = Default::default();
+
+        routes.insert(n1, vec![n1]);
+
+        let mut queue = vec![n1];
+
+        while !queue.is_empty() {
+            let mut new_queue = vec![];
+            for pt in queue {
+                for dest in self.nodes.get(&pt).unwrap() {
+                    if !routes.contains_key(dest) {
+                        let mut v = routes.get(&pt).unwrap().clone();
+                        v.push(*dest);
+                        if *dest == n2 {
+                            return Some(v);
+                        } else {
+                            routes.insert(*dest, v);
+                        }
+                        new_queue.push(*dest);
+                    }
+                }
+            }
+            queue = new_queue;
+        }
+        None
     }
 }
 
@@ -111,14 +153,29 @@ fn do_part1(data: &Data) -> usize {
         println!("Found group: {:?}", grp);
     }
     */
+    let mut edgehist: HashMap<u64, usize> = HashMap::new();
+    let num_nodes = data.names.len();
+    for i in 0..num_nodes/4 {
+        let j = i + num_nodes/2;
+        let p = data.route(i, j).unwrap();
+        for i in 0..(p.len() - 1) {
+            let n1 = p[i];
+            let n2 = p[i+1];
+            let edge = edge_enc(n1, n2);
+            *edgehist.entry(edge).or_default() += 1;
+        }
+    }
+    let mut hist_entries: Vec<_> = edgehist.into_iter()
+        .collect();
+    hist_entries.sort_by_key(|v| usize::MAX - v.1);
 
     let mut ignore_edges = Vec::new();
-    for i in 0..edges.len() {
-        ignore_edges.push(edges[i]);
-        for j in i+1..edges.len() {
-            ignore_edges.push(edges[j]);
-            for k in j+1..edges.len() {
-                ignore_edges.push(edges[k]);
+    for i in 2..edges.len() {
+        ignore_edges.push(hist_entries[i].0);
+        for j in 1..i {
+            ignore_edges.push(hist_entries[j].0);
+            for k in 0..j {
+                ignore_edges.push(hist_entries[k].0);
                 let size = data.group_size(&ignore_edges);
                 if size < data.names.len() {
                     return size * (data.names.len() - size);
@@ -171,6 +228,8 @@ fn main() -> std::io::Result<()>{
     let input = get_input(25)?;
 
     let data = parse_input(&input);
+
+//    data.print_dot();
 
     // Part 1
     println!("{}", part1(&data));
