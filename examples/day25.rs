@@ -9,13 +9,21 @@ struct Data {
     nodes: HashMap<usize, Vec<usize>>,
 }
 
+fn edge_enc(a: usize, b: usize) -> u64 {
+    if a < b {
+        (a as u64)<<32 | (b as u64)
+    } else {
+        (b as u64)<<32 | (a as u64)
+    }
+}
+
 impl Data {
     fn edges(&self) -> Vec<u64> {
         let mut result = Vec::new();
         for (k,v) in &self.nodes {
             for d in v {
                 if k < d {
-                    result.push((*k as u64)<<32 | (*d as u64));
+                    result.push(edge_enc(*k, *d));
                 }
             }
         }
@@ -30,11 +38,7 @@ impl Data {
             nodes.insert(n);
             let links = self.nodes.get(&n).unwrap();
             for other in links {
-                let linkval = if n < *other {
-                    n<<32 | *other
-                } else {
-                    *other<<32 | n
-                } as u64;
+                let linkval = edge_enc(n, *other);
                 if ignore_edges.contains(&linkval) {
                     continue;
                 }
@@ -44,6 +48,21 @@ impl Data {
             }
         }
         nodes.len()
+    }
+
+    fn find_group(&self, i: usize) -> Vec<usize> {
+        let links = self.nodes.get(&i).unwrap();
+
+        let mut all: HashSet<usize> = links.iter().cloned().collect();
+        all.insert(i);
+
+        for l in links {
+            let other_links = self.nodes.get(l).unwrap();
+            let mut other_all: HashSet<usize> = other_links.iter().cloned().collect();
+            other_all.insert(*l);
+            all = all.intersection(&other_all).cloned().collect();
+        }
+        all.into_iter().collect()
     }
 }
 
@@ -85,6 +104,13 @@ fn parse_input(input: &str) -> Data {
 
 fn do_part1(data: &Data) -> usize {
     let edges = data.edges();
+
+    /*
+    for i in 0..data.names.len() {
+        let grp = data.find_group(i);
+        println!("Found group: {:?}", grp);
+    }
+    */
 
     let mut ignore_edges = Vec::new();
     for i in 0..edges.len() {
